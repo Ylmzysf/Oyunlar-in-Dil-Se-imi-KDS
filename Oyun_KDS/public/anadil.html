@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="tr">
+    <head>
+        <meta charset="UTF-8">
+        <title>Oyun Dil KDS</title>
+        <link rel="stylesheet" href="/css/style.css">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    </head>
+<body>
+    <div class="nav-menu">
+        <h2>Oyuna Göre Dil Seçimi KDS</h2>
+        <a href="anadil.html" class="active">Anadil</a>
+        <a href="tablolar.html">Tablolar</a>
+        <a href="analiz.html">Analiz</a>
+        <a href="/logout">Çıkış Yap</a>
+    </div>
+    <div class="content">  
+        <!-- Sadece ikinci grafik kalacak -->
+        <div class="chart-container">
+            <h3>Seçilen Dilin Menşei Olduğu Oyunların Dil Dağılımı</h3>
+            <select id="menseiLanguageSelect" style="margin: 10px; padding: 5px;">
+                <option value="">Dil Seçiniz</option>
+            </select>
+            <canvas id="menseiLanguagesChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Dil seçeneklerini yükle
+        async function loadMenseiLanguageOptions() {
+            try {
+                const response = await fetch('/api/anadil-list');
+                const data = await response.json();
+                const select = document.getElementById('menseiLanguageSelect');
+                
+                data.forEach(lang => {
+                    const option = document.createElement('option');
+                    option.value = lang.dil_ad;
+                    option.textContent = lang.dil_ad;
+                    select.appendChild(option);
+                });
+
+                select.addEventListener('change', createMenseiLanguagesChart);
+            } catch (error) {
+                console.error('Dil seçenekleri yüklenirken hata:', error);
+            }
+        }
+
+        // Menşei dil oyunlarının dil dağılımı grafiği
+        async function createMenseiLanguagesChart() {
+            const selectedLanguage = document.getElementById('menseiLanguageSelect').value;
+            if (!selectedLanguage) return;
+
+            try {
+                const response = await fetch(`/api/anadil-mensei-games/${selectedLanguage}`);
+                const data = await response.json();
+
+                const ctx = document.getElementById('menseiLanguagesChart').getContext('2d');
+                
+                if (window.menseiLanguagesChart instanceof Chart) {
+                    window.menseiLanguagesChart.destroy();
+                }
+
+                window.menseiLanguagesChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.map(d => d.dil_ad),
+                        datasets: [
+                            {
+                                label: 'Oyun Sayısı',
+                                data: data.map(d => d.oyun_sayisi),
+                                backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                                borderColor: 'rgba(75, 192, 192, 1)',
+                                borderWidth: 1,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'Konuşan Nüfus (Milyon)',
+                                data: data.map(d => d.konusan_nufus),
+                                backgroundColor: 'rgba(255, 159, 64, 0.6)',
+                                borderColor: 'rgba(255, 159, 64, 1)',
+                                borderWidth: 1,
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                position: 'left',
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Oyun Sayısı'
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                position: 'right',
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Nüfus (Milyon)'
+                                },
+                                grid: {
+                                    drawOnChartArea: false
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `${selectedLanguage} Menşeli Oyunların Dil Dağılımı ve Konuşan Nüfus`
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += context.parsed.y;
+                                            if (context.dataset.yAxisID === 'y1') {
+                                                label += ' milyon';
+                                            }
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Grafik oluşturulurken hata:', error);
+            }
+        }
+
+        // Sayfa yüklendiğinde dil seçeneklerini yükle
+        document.addEventListener('DOMContentLoaded', loadMenseiLanguageOptions);
+    </script>
+</body>
+</html>

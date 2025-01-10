@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="tr">
+    <head>
+        <meta charset="UTF-8">
+        <title>Oyun Dil KDS</title>
+        <link rel="stylesheet" href="/css/style.css">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            .analysis-form {
+                margin: 20px;
+                padding: 20px;
+                background-color: #f5f5f5;
+                border-radius: 8px;
+                text-align: center;
+            }
+            
+            .selected-types {
+                margin: 10px 0;
+                padding: 10px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+            
+            .selected-type {
+                display: inline-block;
+                margin: 2px;
+                padding: 5px 10px;
+                background-color: #FF9800;
+                color: white;
+                border-radius: 15px;
+                cursor: pointer;
+            }
+            
+            .selected-type:hover {
+                background-color: #F57C00;
+            }
+            
+            .chart-container {
+                margin: 20px;
+                padding: 20px;
+                background-color: white;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+
+            select {
+                padding: 8px;
+                margin: 5px;
+                border-radius: 4px;
+                width: 200px;
+            }
+
+            button {
+                padding: 8px 16px;
+                margin: 5px;
+                border-radius: 4px;
+                border: none;
+                color: white;
+                cursor: pointer;
+                font-weight: bold;
+                transition: background-color 0.3s;
+            }
+
+            button.add-type {
+                background-color: #2196F3;
+            }
+
+            button.add-type:hover {
+                background-color: #1976D2;
+            }
+
+            button.analyze {
+                background-color: #4CAF50;
+            }
+
+            button.analyze:hover {
+                background-color: #45a049;
+            }
+
+            .stats-table {
+                margin: 20px auto;
+                background-color: white;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                border-collapse: collapse;
+                width: 80%;
+                table-layout: fixed;
+            }
+
+            .stats-table th, .stats-table td {
+                padding: 12px;
+                text-align: center;
+                border: 1px solid #ddd;
+                width: 25%;
+                word-wrap: break-word;
+            }
+
+            .stats-table th {
+                background-color: #4CAF50;
+                color: white;
+            }
+
+            .stats-table tr:nth-child(even) {
+                background-color: #f9f9f9;
+            }
+
+            .stats-container {
+                margin: 20px;
+                padding: 20px;
+                text-align: center;
+            }
+        </style>
+    </head>
+<body>
+    <div class="nav-menu">
+        <h2>Oyuna Göre Dil Seçimi KDS</h2>
+        <a href="anadil.html">Anadil</a>
+        <a href="tablolar.html">Tablolar</a>
+        <a href="analiz.html" class="active">Analiz</a>
+        <a href="/logout">Çıkış Yap</a>
+    </div>
+    
+    <div class="content">
+        <div class="analysis-form">
+            <h3>Oyun Türlerini Seçin</h3>
+            <select id="gameTypeSelect">
+                <option value="">Tür seçin...</option>
+            </select>
+            <button onclick="addSelectedType()" class="add-type">Tür Ekle</button>
+            
+            <div id="selectedTypes" class="selected-types">
+                <!-- Seçilen türler buraya eklenecek -->
+            </div>
+            
+            <button onclick="analyzeIntersection()" class="analyze">Analiz Et</button>
+        </div>
+
+        <div class="stats-container" id="statsContainer" style="display: none;">
+            <h3>Tüm Oyunların İstatistikleri</h3>
+            <table class="stats-table">
+                <tr>
+                    <th>Toplam Oyun Sayısı</th>
+                    <th>Genel Ortalama Fiyat</th>
+                    <th>Genel Ortalama Beğeni</th>
+                    <th>Genel Ortalama Takipçi</th>
+                </tr>
+                <tr id="allStatsRow">
+                    <td id="tumOyunSayisi">-</td>
+                    <td id="tumOrtalamaFiyat">-</td>
+                    <td id="tumOrtalamaBegeni">-</td>
+                    <td id="tumOrtalamaTakipci">-</td>
+                </tr>
+            </table>
+
+            <h3>Seçilen Türlerin İstatistikleri</h3>
+            <table class="stats-table">
+                <tr>
+                    <th>Oyun Sayısı</th>
+                    <th>Ortalama Fiyat</th>
+                    <th>Ortalama Beğeni Oranı</th>
+                    <th>Ortalama Takipçi Sayısı</th>
+                </tr>
+                <tr id="statsRow">
+                    <td id="oyunSayisi">-</td>
+                    <td id="ortalamaFiyat">-</td>
+                    <td id="ortalamaBegeni">-</td>
+                    <td id="ortalamaTakipci">-</td>
+                </tr>
+            </table>
+
+            <h3>Aradaki Fark</h3>
+            <table class="stats-table">
+                <tr>
+                    <th>Oyun Sayısı Oranı</th>
+                    <th>Fiyat Farkı</th>
+                    <th>Beğeni Oranı Farkı</th>
+                    <th>Takipçi Sayısı Farkı</th>
+                </tr>
+                <tr id="diffRow">
+                    <td id="oyunSayisiOran">-</td>
+                    <td id="fiyatFark">-</td>
+                    <td id="begeniFark">-</td>
+                    <td id="takipciFark">-</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="languageChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let selectedTypes = new Set();
+        let chart = null;
+
+        // Sayfa yüklendiğinde türleri getir
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('/api/gametypes');
+                const types = await response.json();
+                const select = document.getElementById('gameTypeSelect');
+                
+                // Türleri alfabetik sıraya göre sırala
+                types.sort((a, b) => a.tur_ad.localeCompare(b.tur_ad, 'tr'));
+                
+                types.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type.tur_ad;
+                    option.textContent = type.tur_ad;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Türler yüklenirken hata:', error);
+            }
+        });
+
+        // Seçilen türü ekle
+        function addSelectedType() {
+            const select = document.getElementById('gameTypeSelect');
+            const selectedType = select.value;
+            
+            if (selectedType && !selectedTypes.has(selectedType)) {
+                selectedTypes.add(selectedType);
+                updateSelectedTypesDisplay();
+            }
+        }
+
+        // Seçilen türleri görüntüle
+        function updateSelectedTypesDisplay() {
+            const container = document.getElementById('selectedTypes');
+            container.innerHTML = '';
+            
+            selectedTypes.forEach(type => {
+                const typeElement = document.createElement('span');
+                typeElement.className = 'selected-type';
+                typeElement.textContent = type;
+                typeElement.onclick = () => removeType(type);
+                container.appendChild(typeElement);
+            });
+        }
+
+        // Türü kaldır
+        function removeType(type) {
+            selectedTypes.delete(type);
+            updateSelectedTypesDisplay();
+        }
+
+        // Kesişim analizi yap
+        async function analyzeIntersection() {
+            if (selectedTypes.size === 0) {
+                alert('Lütfen en az bir tür seçin');
+                return;
+            }
+
+            try {
+                // Seçilen türlerin istatistiklerini getir
+                const statsResponse = await fetch('/api/analyze-stats', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        types: Array.from(selectedTypes)
+                    })
+                });
+                
+                const statsData = await statsResponse.json();
+                updateStats(statsData);
+
+                // Tüm oyunların istatistiklerini getir
+                const allStatsResponse = await fetch('/api/all-games-stats');
+                const allStatsData = await allStatsResponse.json();
+                updateAllStats(allStatsData);
+
+                // Dil analizini getir
+                const response = await fetch('/api/analyze-intersection', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        types: Array.from(selectedTypes)
+                    })
+                });
+                
+                const data = await response.json();
+                createChart(data);
+            } catch (error) {
+                console.error('Analiz yapılırken hata:', error);
+            }
+        }
+
+        // Grafik oluştur
+        function createChart(data) {
+            const ctx = document.getElementById('languageChart').getContext('2d');
+            const originalData = [...data]; // Orijinal veriyi sakla
+            
+            if (chart) {
+                chart.destroy();
+            }
+
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.dil_ad),
+                    datasets: [
+                        {
+                            label: 'Dil Kullanım Sayısı',
+                            data: data.map(d => d.kullanim_sayisi),
+                            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Konuşan Nüfus (Milyon)',
+                            data: data.map(d => d.konusan_nufus),
+                            backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Oyun Sayısı'
+                            }
+                        },
+                        y1: {
+                            beginAtZero: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Konuşan Nüfus (Milyon)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Diller'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Seçilen Türlerdeki Oyunların Dil Dağılımı ve Konuşan Nüfus'
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            onClick: function(e, legendItem, legend) {
+                                const index = legendItem.datasetIndex;
+                                const ci = legend.chart;
+                                const meta = ci.getDatasetMeta(index);
+                                
+                                // Görünürlüğü değiştir
+                                meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+                                ci.update();
+
+                                // Eğer sadece konuşan nüfus görünürse, verileri nüfusa göre sırala
+                                if (ci.getDatasetMeta(0).hidden && !ci.getDatasetMeta(1).hidden) {
+                                    // Verileri nüfusa göre sırala
+                                    const sortedData = [...data].sort((a, b) => b.konusan_nufus - a.konusan_nufus);
+                                    ci.data.labels = sortedData.map(d => d.dil_ad);
+                                    ci.data.datasets[1].data = sortedData.map(d => d.konusan_nufus);
+                                    ci.data.datasets[0].data = sortedData.map(d => d.kullanim_sayisi);
+                                } else {
+                                    // Orijinal sıralamaya dön (kullanım sayısına göre)
+                                    ci.data.labels = originalData.map(d => d.dil_ad);
+                                    ci.data.datasets[0].data = originalData.map(d => d.kullanim_sayisi);
+                                    ci.data.datasets[1].data = originalData.map(d => d.konusan_nufus);
+                                }
+                                ci.update();
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        if (context.datasetIndex === 0) {
+                                            label += context.parsed.y + ' oyun';
+                                        } else {
+                                            label += context.parsed.y + ' milyon konuşan';
+                                        }
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // İstatistikleri güncelle
+        function updateStats(stats) {
+            document.getElementById('statsContainer').style.display = 'block';
+            document.getElementById('oyunSayisi').textContent = stats.oyun_sayisi;
+            document.getElementById('ortalamaFiyat').textContent = stats.ortalama_fiyat + ' ₺';
+            document.getElementById('ortalamaBegeni').textContent = '%' + stats.ortalama_begeni;
+            document.getElementById('ortalamaTakipci').textContent = stats.ortalama_takipci.toLocaleString() + ' bin';
+
+            // Farkları hesapla ve göster
+            calculateDifferences();
+        }
+
+        // Tüm oyunların istatistiklerini güncelle
+        function updateAllStats(stats) {
+            document.getElementById('tumOyunSayisi').textContent = stats.oyun_sayisi;
+            document.getElementById('tumOrtalamaFiyat').textContent = stats.ortalama_fiyat + ' ₺';
+            document.getElementById('tumOrtalamaBegeni').textContent = '%' + stats.ortalama_begeni;
+            document.getElementById('tumOrtalamaTakipci').textContent = stats.ortalama_takipci.toLocaleString() + ' bin';
+
+            // Farkları hesapla ve göster
+            calculateDifferences();
+        }
+
+        // Farkları hesapla ve göster
+        function calculateDifferences() {
+            // Değerleri al ve sayıya çevir
+            const tumOyunSayisi = parseInt(document.getElementById('tumOyunSayisi').textContent) || 0;
+            const oyunSayisi = parseInt(document.getElementById('oyunSayisi').textContent) || 0;
+            
+            const tumOrtalamaFiyat = parseFloat(document.getElementById('tumOrtalamaFiyat').textContent) || 0;
+            const ortalamaFiyat = parseFloat(document.getElementById('ortalamaFiyat').textContent) || 0;
+            
+            const tumOrtalamaBegeni = parseFloat(document.getElementById('tumOrtalamaBegeni').textContent.replace('%', '')) || 0;
+            const ortalamaBegeni = parseFloat(document.getElementById('ortalamaBegeni').textContent.replace('%', '')) || 0;
+            
+            const tumOrtalamaTakipci = parseInt(document.getElementById('tumOrtalamaTakipci').textContent.replace(/[^0-9-]/g, '')) || 0;
+            const ortalamaTakipci = parseInt(document.getElementById('ortalamaTakipci').textContent.replace(/[^0-9-]/g, '')) || 0;
+
+            // Oranı ve farkları hesapla
+            const oyunSayisiOran = tumOyunSayisi > 0 ? ((oyunSayisi / tumOyunSayisi) * 100).toFixed(2) : 0;
+            const fiyatFark = -(tumOrtalamaFiyat - ortalamaFiyat);
+            const begeniFark = -(tumOrtalamaBegeni - ortalamaBegeni);
+            const takipciFark = -(tumOrtalamaTakipci - ortalamaTakipci);
+
+            // Değerleri göster
+            document.getElementById('oyunSayisiOran').textContent = '%' + oyunSayisiOran;
+            document.getElementById('fiyatFark').textContent = fiyatFark.toFixed(2) + ' ₺';
+            document.getElementById('begeniFark').textContent = begeniFark.toFixed(2) + '%';
+            document.getElementById('takipciFark').textContent = takipciFark.toLocaleString() + ' bin';
+        }
+
+        // createAnalysisChart fonksiyonunu güncelle
+        async function createAnalysisChart() {
+            try {
+                const response = await fetch('/api/analysis-data');
+                const data = await response.json();
+
+                const ctx = document.getElementById('analysisChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.map(d => d.dil_ad),
+                        datasets: [
+                            {
+                                label: 'Oyun Sayısı',
+                                data: data.map(d => d.oyun_sayisi),
+                                backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                                borderColor: 'rgba(75, 192, 192, 1)',
+                                borderWidth: 1,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'Ortalama Fiyat (TL)',
+                                data: data.map(d => d.ortalama_fiyat),
+                                backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                                borderColor: 'rgba(255, 99, 132, 1)',
+                                borderWidth: 1,
+                                yAxisID: 'y1'
+                            },
+                            {
+                                label: 'Konuşan Nüfus (Milyon)',
+                                data: data.map(d => d.nufus_konusan_m),
+                                backgroundColor: 'rgba(255, 159, 64, 0.6)',
+                                borderColor: 'rgba(255, 159, 64, 1)',
+                                borderWidth: 1,
+                                yAxisID: 'y2'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                position: 'left',
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Oyun Sayısı'
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                position: 'right',
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Ortalama Fiyat (TL)'
+                                },
+                                grid: {
+                                    drawOnChartArea: false
+                                }
+                            },
+                            y2: {
+                                type: 'linear',
+                                position: 'right',
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Nüfus (Milyon)'
+                                },
+                                grid: {
+                                    drawOnChartArea: false
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Dillere Göre Oyun Sayısı, Ortalama Fiyat ve Konuşan Nüfus Analizi'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            if (context.datasetIndex === 1) {
+                                                label += context.parsed.y.toFixed(2) + ' TL';
+                                            } else if (context.datasetIndex === 2) {
+                                                label += context.parsed.y + ' milyon';
+                                            } else {
+                                                label += context.parsed.y;
+                                            }
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Grafik oluşturulurken hata:', error);
+            }
+        }
+    </script>
+</body>
+</html> 

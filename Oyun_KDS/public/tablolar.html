@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="tr">
+    <head>
+        <meta charset="UTF-8">
+        <title>Oyun Dil KDS</title>
+        <link rel="stylesheet" href="/css/style.css">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            .charts-row {
+                display: flex;
+                justify-content: space-between;
+                flex-wrap: wrap;
+            }
+            
+            .chart-container {
+                margin: 20px;
+                padding: 20px;
+                background-color: white;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                flex: 1;
+                min-width: 45%;
+            }
+        </style>
+    </head>
+<body>  
+    <div class="nav-menu">
+        <h2>Oyuna Göre Dil Seçimi KDS</h2>
+        <a href="anadil.html">Anadil</a>
+        <a href="tablolar.html" class="active">Tablolar</a>
+        <a href="analiz.html">Analiz</a>
+        <a href="/logout">Çıkış Yap</a>
+    </div>
+
+    <div class="content">
+        <div class="charts-row">
+            <div class="chart-container">
+                <h3>Tüm Oyunlardaki Dil Dağılımı</h3>
+                <canvas id="allGamesChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="languagePopulationChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>Tüm Oyunlardaki Tür Dağılımı</h3>
+                <canvas id="allTypesChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sayfa yüklendiğinde tüm verileri getir
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // Dil analizi
+                const langResponse = await fetch('/api/all-games-languages');
+                const langData = await langResponse.json();
+                createAllGamesChart(langData);
+
+                // Tür analizi
+                const typeResponse = await fetch('/api/all-games-types');
+                const typeData = await typeResponse.json();
+                createAllTypesChart(typeData);
+
+                // Dil popülasyonu analizi
+                await createLanguagePopulationChart();
+
+                // Dil seçeneklerini yükle
+                await loadLanguageOptions();
+            } catch (error) {
+                console.error('Veriler yüklenirken hata:', error);
+            }
+        });
+
+        // Mevcut grafik fonksiyonu aynı kalacak
+        function createAllGamesChart(data) {
+            const ctx = document.getElementById('allGamesChart').getContext('2d');
+            const originalData = [...data];
+            const byTotalSpeakers = [...data].sort((a, b) => b.toplam_konusan_nufus - a.toplam_konusan_nufus);
+            
+            let chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.dil_ad),
+                    datasets: [
+                        {
+                            label: 'Dil Kullanım Sayısı',
+                            data: data.map(d => d.kullanim_sayisi),
+                            backgroundColor: 'rgba(153, 102, 255, 0.6)',
+                            borderColor: 'rgba(153, 102, 255, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Toplam Konuşan Nüfus (Milyon)',
+                            data: data.map(d => d.toplam_konusan_nufus),
+                            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Oyun Sayısı'
+                            }
+                        },
+                        y1: {
+                            beginAtZero: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Nüfus (Milyon)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            onClick: function(e, legendItem, legend) {
+                                const index = legendItem.datasetIndex;
+                                const ci = legend.chart;
+                                const meta = ci.getDatasetMeta(index);
+                                
+                                // Görünürlüğü değiştir
+                                meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+                                ci.update();
+
+                                // Sadece toplam konuşan nüfus görünürse
+                                if (ci.getDatasetMeta(0).hidden && !ci.getDatasetMeta(1).hidden) {
+                                    // Toplam konuşan nüfusa göre sırala
+                                    ci.data.labels = byTotalSpeakers.map(d => d.dil_ad);
+                                    ci.data.datasets[0].data = byTotalSpeakers.map(d => d.kullanim_sayisi);
+                                    ci.data.datasets[1].data = byTotalSpeakers.map(d => d.toplam_konusan_nufus);
+                                } else {
+                                    // Orijinal sıralamaya dön (kullanım sayısına göre)
+                                    ci.data.labels = originalData.map(d => d.dil_ad);
+                                    ci.data.datasets[0].data = originalData.map(d => d.kullanim_sayisi);
+                                    ci.data.datasets[1].data = originalData.map(d => d.toplam_konusan_nufus);
+                                }
+                                ci.update();
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Tür dağılımı için yeni grafik fonksiyonu
+        function createAllTypesChart(data) {
+            const ctx = document.getElementById('allTypesChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.tur_ad),
+                    datasets: [{
+                        label: 'Oyun Sayısı',
+                        data: data.map(d => d.kullanim_sayisi),
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Oyun Sayısı'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Oyun Türleri'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'En Popüler Oyun Türleri'
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.parsed.y} oyun`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function createLanguagePopulationChart() {
+            try {
+                const response = await fetch('/api/languages-population-diff');
+                const data = await response.json();
+
+                // Ana dil konuşan sayısına göre sırala
+                const byNativeSpeakers = [...data].sort((a, b) => b.anadil_nufus - a.anadil_nufus);
+                // İkinci dil konuşan sayısına göre sırala
+                const bySecondSpeakers = [...data].sort((a, b) => b.ikinci_dil_nufus - a.ikinci_dil_nufus);
+
+                const ctx = document.getElementById('languagePopulationChart').getContext('2d');
+                const chart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: byNativeSpeakers.map(d => d.dil_ad),
+                        datasets: [
+                            {
+                                label: 'Ana Dil Konuşanlar (Milyon)',
+                                data: byNativeSpeakers.map(d => d.anadil_nufus),
+                                backgroundColor: 'rgba(255, 159, 64, 0.6)',
+                                borderColor: 'rgba(255, 159, 64, 1)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'İkinci Dil Olarak Konuşanlar (Milyon)',
+                                data: byNativeSpeakers.map(d => d.ikinci_dil_nufus),
+                                backgroundColor: 'rgba(153, 102, 255, 0.6)',
+                                borderColor: 'rgba(153, 102, 255, 1)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Nüfus (Milyon)'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Dillere Göre Ana Dil ve İkinci Dil Konuşan Nüfus Karşılaştırması'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += context.parsed.y + ' milyon';
+                                        }
+                                        return label;
+                                    }
+                                }
+                            },
+                            legend: {
+                                onClick: function(e, legendItem, legend) {
+                                    const index = legendItem.datasetIndex;
+                                    const ci = legend.chart;
+                                    const meta = ci.getDatasetMeta(index);
+
+                                    // Görünürlüğü değiştir
+                                    meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+                                    ci.update();
+
+                                    // Sadece ikinci dil görünürse
+                                    if (ci.getDatasetMeta(0).hidden && !ci.getDatasetMeta(1).hidden) {
+                                        // İkinci dil konuşanlara göre sırala
+                                        ci.data.labels = bySecondSpeakers.map(d => d.dil_ad);
+                                        ci.data.datasets[0].data = bySecondSpeakers.map(d => d.anadil_nufus);
+                                        ci.data.datasets[1].data = bySecondSpeakers.map(d => d.ikinci_dil_nufus);
+                                    } else {
+                                        // Ana dile göre sırala
+                                        ci.data.labels = byNativeSpeakers.map(d => d.dil_ad);
+                                        ci.data.datasets[0].data = byNativeSpeakers.map(d => d.anadil_nufus);
+                                        ci.data.datasets[1].data = byNativeSpeakers.map(d => d.ikinci_dil_nufus);
+                                    }
+                                    ci.update();
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Grafik oluşturulurken hata:', error);
+            }
+        }
+
+        // Dil seçeneklerini yükle
+        async function loadLanguageOptions() {
+            try {
+                const response = await fetch('/api/all-games-languages');
+                const data = await response.json();
+                const select = document.getElementById('languageSelect');
+                
+                data.forEach(lang => {
+                    const option = document.createElement('option');
+                    option.value = lang.dil_ad;
+                    option.textContent = lang.dil_ad;
+                    select.appendChild(option);
+                });
+
+                // İlk seçim değişikliğini dinle
+                select.addEventListener('change', createOriginLanguagesChart);
+            } catch (error) {
+                console.error('Dil seçenekleri yüklenirken hata:', error);
+            }
+        }
+
+        // Menşei ülke oyunlarının dil dağılımı grafiği
+        async function createOriginLanguagesChart() {
+            const selectedLanguage = document.getElementById('languageSelect').value;
+            if (!selectedLanguage) return;
+
+            try {
+                const response = await fetch(`/api/games-by-language-origin/${selectedLanguage}`);
+                const data = await response.json();
+
+                const ctx = document.getElementById('originLanguagesChart').getContext('2d');
+                
+                // Eğer önceki grafik varsa yok et
+                if (window.originLanguagesChart instanceof Chart) {
+                    window.originLanguagesChart.destroy();
+                }
+
+                window.originLanguagesChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.map(d => d.dil_ad),
+                        datasets: [{
+                            label: 'Dil Kullanım Sayısı',
+                            data: data.map(d => d.kullanim_sayisi),
+                            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Oyun Sayısı'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `${selectedLanguage} Menşeli Oyunlardaki Dil Dağılımı`
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Grafik oluşturulurken hata:', error);
+            }
+        }
+    </script>
+</body>
+</html> 
