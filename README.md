@@ -1,4 +1,4 @@
-# Oyunlar-in-Dil-Se-imi-KDS
-KDS dersim için geliştirdiğim örnek bir karar destek sistemi
-Proje bir node.js projesi çalışması için node modules dosyası gerekli, routes dosyasındaki yollar ilgili html sayfaları ile aynı isimde veya ingilizceleri
-Projenin amacı bir indie oyun şirketinin yaptığı oyunların hangi dillerde yayınlanmasına karar vermesine yardımcı olucak bir sistem.
+# Language Decision for Games DSS
+A sample decision support system that I developed for my KDS course.
+The project is a node.js project that requires a node modules file to work, the paths in the routes file have the same name as the relevant html pages or their English equivalents. 
+The aim of the project is to help an indie game company decide in which languages ​​its games should be published.
